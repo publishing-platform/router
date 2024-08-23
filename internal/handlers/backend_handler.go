@@ -3,17 +3,17 @@ package handlers
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"	
+	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"syscall"
 	"time"
-	"net/http"
-	"net/http/httputil"
-		
-	"github.com/publishing-platform/router/internal/logger"		
+
+	"github.com/publishing-platform/router/internal/logger"
 )
 
 var TLSSkipVerify bool
@@ -49,7 +49,7 @@ func NewBackendHandler(
 		}
 
 		populateViaHeader(req.Header, fmt.Sprintf("%d.%d", req.ProtoMajor, req.ProtoMinor))
-	}	
+	}
 
 	return proxy
 }
@@ -81,9 +81,9 @@ func newBackendTransport(
 	transport := http.Transport{}
 
 	transport.DialContext = (&net.Dialer{ // A Dialer contains options for connecting to an address.
-		Timeout: connectTimeout, // Configured by caller
+		Timeout:   connectTimeout,   // Configured by caller
 		KeepAlive: 30 * time.Second, // same as DefaultTransport
-		DualStack: true,             // same as DefaultTransport		
+		DualStack: true,             // same as DefaultTransport
 	}).DialContext
 
 	// Remember, we have one transport per backend
@@ -113,13 +113,13 @@ func newBackendTransport(
 	//
 	// Same values as http.DefaultTransport
 	transport.TLSHandshakeTimeout = 10 * time.Second
-	transport.ExpectContinueTimeout = 1 * time.Second	
+	transport.ExpectContinueTimeout = 1 * time.Second
 
 	if TLSSkipVerify {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	}	
+	}
 
-	return &backendTransport{backendID, &transport, logger}	
+	return &backendTransport{backendID, &transport, logger}
 }
 
 func closeBody(resp *http.Response) {
@@ -153,7 +153,7 @@ func (bt *backendTransport) RoundTrip(req *http.Request) (resp *http.Response, e
 	}
 	responseCode = resp.StatusCode
 	populateViaHeader(resp.Header, fmt.Sprintf("%d.%d", resp.ProtoMajor, resp.ProtoMinor))
-	return	
+	return
 }
 
 func newErrorResponse(status int) (resp *http.Response) {

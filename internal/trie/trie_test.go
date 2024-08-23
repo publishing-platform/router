@@ -29,7 +29,7 @@ type Example struct {
 }
 
 // In these table-driven tests, each Example consists of:
-// 
+//
 //   - a slice of FixtureRows which are inserted into the Trie
 //   - a set of Expectations, which consist of a Trie path and expected return
 //     values and "ok" checks

@@ -20,6 +20,6 @@ func NewAPIHandler(rout *Router) (api http.Handler, err error) {
 			log.Println(err)
 		}
 	})
-	
+
 	return mux, nil
 }

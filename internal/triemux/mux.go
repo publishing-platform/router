@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/publishing-platform/router/internal/handlers"
-	"github.com/publishing-platform/router/internal/trie"	
+	"github.com/publishing-platform/router/internal/trie"
 )
 
 type Mux struct {
@@ -55,7 +55,7 @@ func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	handler.ServeHTTP(w, r)	
+	handler.ServeHTTP(w, r)
 }
 
 var reShouldRedirect = regexp.MustCompile(`^\/[A-Z]+[A-Z\W\d]+$`)
