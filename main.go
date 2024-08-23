@@ -47,7 +47,7 @@ func main() {
 	fmt.Println("Publishing Platform Router")
 
 	var (
-		pubAddr = getenv("ROUTER_PUBADDR", ":8080")
+		pubAddr         = getenv("ROUTER_PUBADDR", ":8080")
 		apiAddr         = getenv("ROUTER_APIADDR", ":8081")
 		databaseURL     = getenv("DATABASE_URL", "postgresql://postgres@127.0.0.1:5432/router_development?sslmode=disable")
 		databaseName    = getenv("DATABASE_NAME", "router_development")
@@ -112,5 +112,5 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("router: listening for API requests on %v", apiAddr)
-	listenAndServeOrFatal(apiAddr, api, feReadTimeout, feWriteTimeout)	
+	listenAndServeOrFatal(apiAddr, api, feReadTimeout, feWriteTimeout)
 }

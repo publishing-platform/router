@@ -168,6 +168,11 @@ func (rt *Router) pollAndReload() {
 }
 
 func (rt *Router) shouldReload(listener *pq.Listener) bool {
+	// we assume a route count of zero means router startup
+	if rt.mux.RouteCount() == 0 {
+		return true
+	}
+
 	select {
 	case n := <-listener.Notify:
 		// n.Extra contains the payload from the notification
