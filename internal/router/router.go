@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,11 +41,6 @@ type Options struct {
 	BackendConnTimeout   time.Duration
 	BackendHeaderTimeout time.Duration
 	LogFileName          string
-}
-
-type Backend struct {
-	BackendID  sql.NullString
-	BackendURL sql.NullString
 }
 
 type Route struct {
@@ -205,7 +201,7 @@ func (rt *Router) reloadRoutes(db *sql.DB) {
 
 	newmux := triemux.NewMux()
 
-	backends := rt.loadBackends(db)
+	backends := rt.loadBackendsFromEnv()
 	loadRoutes(db, newmux, backends)
 	routeCount := newmux.RouteCount()
 
@@ -216,36 +212,35 @@ func (rt *Router) reloadRoutes(db *sql.DB) {
 	log.Println(fmt.Sprintf("router: reloaded %d routes", routeCount))
 }
 
-// loadBackends is a helper function which loads backends from the
-// passed database, constructs a Handler for each one, and returns
-// them in map keyed on the backend_id
-func (rt *Router) loadBackends(db *sql.DB) (backends map[string]http.Handler) {
-	backend := &Backend{}
+func (rt *Router) loadBackendsFromEnv() (backends map[string]http.Handler) {
 	backends = make(map[string]http.Handler)
 
-	rows, err := db.Query("SELECT backend_id, backend_url FROM backends")
-	if err != nil {
-		log.Println(fmt.Sprintf("pq: error retrieving row information from table, skipping update. (error: %v)", err))
-		return
-	}
+	for _, envvar := range os.Environ() {
+		pair := strings.SplitN(envvar, "=", 2)
 
-	for rows.Next() {
-		err := rows.Scan(&backend.BackendID, &backend.BackendURL)
-		if err != nil {
-			log.Println(fmt.Sprintf("pq: error retrieving row information from table, skipping update. (error: %v)", err))
-			return
-		}
-
-		backendURL, err := backend.ParseURL()
-		if err != nil {
-			log.Println(fmt.Sprintf("router: couldn't parse URL %s for backends %s "+
-				"(error: %v), skipping!", backend.BackendURL.String, backend.BackendID.String, err))
+		if !strings.HasPrefix(pair[0], "BACKEND_URL_") {
 			continue
 		}
 
-		backends[backend.BackendID.String] = handlers.NewBackendHandler(
-			backend.BackendID.String,
-			backendURL,
+		backendID := strings.TrimPrefix(pair[0], "BACKEND_URL_")
+		backendURL := pair[1]
+
+		if backendURL == "" {
+			log.Println(fmt.Sprintf("no URL for backend %s provided, skipping)", backendID))
+			// logger.Warn().Msgf("no URL for backend %s provided, skipping", backendID)
+			continue
+		}
+
+		backend, err := url.Parse(backendURL)
+		if err != nil {
+			log.Println(fmt.Sprintf("failed to parse URL %s for backend %s, skipping", backendURL, backendID))
+			// logger.Warn().Err(err).Msgf("failed to parse URL %s for backend %s, skipping", backendURL, backendID)
+			continue
+		}
+
+		backends[backendID] = handlers.NewBackendHandler(
+			backendID,
+			backend,
 			rt.opts.BackendConnTimeout,
 			rt.opts.BackendHeaderTimeout,
 			rt.logger,
@@ -328,14 +323,6 @@ func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler) 
 			continue
 		}
 	}
-}
-
-func (be *Backend) ParseURL() (*url.URL, error) {
-	backendURL := os.Getenv(fmt.Sprintf("BACKEND_URL_%s", be.BackendID.String))
-	if backendURL == "" {
-		backendURL = be.BackendURL.String
-	}
-	return url.Parse(backendURL)
 }
 
 func shouldPreserveSegments(route *Route) bool {
