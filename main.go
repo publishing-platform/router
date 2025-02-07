@@ -48,7 +48,7 @@ func listenAndServeOrFatal(addr string, handler http.Handler, rTimeout time.Dura
 }
 
 func main() {
-	fmt.Println("Publishing Platform Router")
+	fmt.Printf("Publishing Platform Router: %s\n", router.VersionInfo())
 
 	// Initialize Sentry
 	if err := sentry.Init(sentry.ClientOptions{}); err != nil {
