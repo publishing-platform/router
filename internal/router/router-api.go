@@ -1,7 +1,6 @@
 package router
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -21,11 +20,11 @@ func NewAPIHandler(rout *Router) (api http.Handler, err error) {
 		case rout.ReloadChan <- true:
 		default:
 		}
-		log.Println("router: reload queued")
+		rout.Logger.Info().Msg("reload queued")
 		w.WriteHeader(http.StatusAccepted)
 		_, err := w.Write([]byte("Reload queued"))
 		if err != nil {
-			log.Println(err)
+			rout.Logger.Warn().Err(err).Msg("failed to write response")
 		}
 	})
 
@@ -38,7 +37,7 @@ func NewAPIHandler(rout *Router) (api http.Handler, err error) {
 
 		_, err := w.Write([]byte("OK"))
 		if err != nil {
-			log.Println(err)
+			rout.Logger.Warn().Err(err).Msg("failed to write response")
 		}
 	})
 

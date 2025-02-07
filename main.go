@@ -7,6 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentryzerolog "github.com/getsentry/sentry-go/zerolog"
+	"github.com/rs/zerolog"
+
 	"github.com/publishing-platform/router/internal/handlers"
 	"github.com/publishing-platform/router/internal/router"
 )
@@ -46,13 +50,37 @@ func listenAndServeOrFatal(addr string, handler http.Handler, rTimeout time.Dura
 func main() {
 	fmt.Println("Publishing Platform Router")
 
+	// Initialize Sentry
+	if err := sentry.Init(sentry.ClientOptions{}); err != nil {
+		panic(err)
+	}
+
+	defer sentry.Flush(2 * time.Second)
+
+	// Configure Sentry Zerolog Writer
+	writer, err := sentryzerolog.New(sentryzerolog.Config{
+		ClientOptions: sentry.ClientOptions{},
+		Options: sentryzerolog.Options{
+			Levels:          []zerolog.Level{zerolog.ErrorLevel, zerolog.FatalLevel},
+			FlushTimeout:    3 * time.Second,
+			WithBreadcrumbs: true,
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer writer.Close()
+
+	// Initialize Zerolog
+	m := zerolog.MultiLevelWriter(os.Stderr, writer)
+	logger := zerolog.New(m).With().Timestamp().Logger()
+
 	var (
 		pubAddr         = getenv("ROUTER_PUBADDR", ":8080")
 		apiAddr         = getenv("ROUTER_APIADDR", ":8081")
 		databaseURL     = getenv("DATABASE_URL", "postgresql://postgres@127.0.0.1:5432/router_development?sslmode=disable")
 		databaseName    = getenv("DATABASE_NAME", "router_development")
 		dbPollInterval  = getenvDuration("ROUTER_POLL_INTERVAL", "2s")
-		errorLogFile    = getenv("ROUTER_ERROR_LOG", "STDERR")
 		tlsSkipVerify   = os.Getenv("ROUTER_TLS_SKIP_VERIFY") != ""
 		beConnTimeout   = getenvDuration("ROUTER_BACKEND_CONNECT_TIMEOUT", "1s")
 		beHeaderTimeout = getenvDuration("ROUTER_BACKEND_HEADER_TIMEOUT", "20s")
@@ -60,10 +88,12 @@ func main() {
 		feWriteTimeout  = getenvDuration("ROUTER_FRONTEND_WRITE_TIMEOUT", "60s")
 	)
 
+	logger.Info().Msgf("frontend read timeout: %v", feReadTimeout)
+	logger.Info().Msgf("frontend write timeout: %v", feWriteTimeout)
+
 	if tlsSkipVerify {
 		handlers.TLSSkipVerify = true
-		log.Printf("skipping verification of TLS certificates; " +
-			"Do not use this option in a production environment.")
+		logger.Warn().Msg("skipping verification of TLS certificates; Do not use this option in a production environment.")
 	}
 
 	rout, err := router.NewRouter(router.Options{
@@ -72,10 +102,10 @@ func main() {
 		DatabasePollInterval: dbPollInterval,
 		BackendConnTimeout:   beConnTimeout,
 		BackendHeaderTimeout: beHeaderTimeout,
-		LogFileName:          errorLogFile,
+		Logger:               logger,
 	})
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Msg("failed to create router")
 	}
 
 	// DEBGUGGING
@@ -105,12 +135,12 @@ func main() {
 	go rout.SelfUpdateRoutes()
 
 	go listenAndServeOrFatal(pubAddr, rout, feReadTimeout, feWriteTimeout)
-	log.Printf("router: listening for requests on %v", pubAddr)
+	logger.Info().Msgf("listening for requests on %v", pubAddr)
 
 	api, err := router.NewAPIHandler(rout)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Msg("failed to create API handler")
 	}
-	log.Printf("router: listening for API requests on %v", apiAddr)
+	logger.Info().Msgf("listening for API requests on %v", apiAddr)
 	listenAndServeOrFatal(apiAddr, api, feReadTimeout, feWriteTimeout)
 }

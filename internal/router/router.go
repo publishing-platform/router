@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/lib/pq"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,8 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/publishing-platform/router/internal/handlers"
-	"github.com/publishing-platform/router/internal/logger"
 	"github.com/publishing-platform/router/internal/triemux"
 )
 
@@ -28,9 +28,9 @@ const (
 type Router struct {
 	mux        *triemux.Mux
 	lock       sync.RWMutex
-	logger     logger.Logger
 	opts       Options
 	ReloadChan chan bool
+	Logger     zerolog.Logger
 }
 
 type Options struct {
@@ -40,7 +40,7 @@ type Options struct {
 	DatabasePollInterval time.Duration
 	BackendConnTimeout   time.Duration
 	BackendHeaderTimeout time.Duration
-	LogFileName          string
+	Logger               zerolog.Logger
 }
 
 type Route struct {
@@ -55,20 +55,13 @@ type Route struct {
 }
 
 func NewRouter(o Options) (rt *Router, err error) {
-	log.Println("router: using database poll interval:", o.DatabasePollInterval)
-	log.Println("router: using backend connect timeout:", o.BackendConnTimeout)
-	log.Println("router: using backend header timeout:", o.BackendHeaderTimeout)
-
-	l, err := logger.New(o.LogFileName)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Println("router: logging errors as JSON to", o.LogFileName)
+	o.Logger.Info().Msgf("using database poll interval: %v", o.DatabasePollInterval)
+	o.Logger.Info().Msgf("using backend connect timeout: %v", o.BackendConnTimeout)
+	o.Logger.Info().Msgf("using backend header timeout: %v", o.BackendHeaderTimeout)
 
 	listenerProblemReporter := func(event pq.ListenerEventType, err error) {
 		if err != nil {
-			log.Println(fmt.Sprintf("pq: error creating listener for PSQL notify channel: %v)", err))
+			o.Logger.Error().Err(err).Msg("error creating listener for PSQL notify channel")
 			return
 		}
 	}
@@ -83,9 +76,9 @@ func NewRouter(o Options) (rt *Router, err error) {
 
 	rt = &Router{
 		mux:        triemux.NewMux(),
-		logger:     l,
 		opts:       o,
 		ReloadChan: make(chan bool, 1),
+		Logger:     o.Logger,
 	}
 
 	go rt.pollAndReload()
@@ -98,16 +91,7 @@ func NewRouter(o Options) (rt *Router, err error) {
 func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("router: recovered from panic in ServeHTTP:", r)
-
-			errorMessage := fmt.Sprintf("panic: %v", r)
-			// err := logger.RecoveredError{ErrorMessage: errorMessage}
-
-			// logger.NotifySentry(logger.ReportableError{Error: err, Request: req})
-			rt.logger.LogFromClientRequest(map[string]interface{}{
-				"error":  errorMessage,
-				"status": http.StatusInternalServerError,
-			}, req)
+			rt.Logger.Err(fmt.Errorf("%v", r)).Msgf("recovered from panic in ServeHTTP")
 
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -121,11 +105,11 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (rt *Router) SelfUpdateRoutes() {
-	log.Println("router: starting self-update process, polling for route changes every", rt.opts.DatabasePollInterval)
+	rt.Logger.Info().Msgf("starting self-update process, polling for route changes every: %v", rt.opts.DatabasePollInterval)
 
 	tick := time.Tick(rt.opts.DatabasePollInterval)
 	for range tick {
-		log.Println("router: polling db for changes")
+		rt.Logger.Info().Msg("polling db for changes")
 
 		rt.ReloadChan <- true
 	}
@@ -139,25 +123,25 @@ func (rt *Router) pollAndReload() {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println(r)
+					rt.Logger.Err(fmt.Errorf("%v", r)).Msgf("recovered from panic in pollAndReload")
 				}
 			}()
 
-			log.Println("pq: connecting to", rt.opts.DatabaseURL)
+			rt.Logger.Info().Msgf("connecting to: %v", rt.opts.DatabaseURL)
 
 			db, err := sql.Open("postgres", rt.opts.DatabaseURL)
 			if err != nil {
-				log.Println(fmt.Sprintf("pq: error connecting to PSQL database, skipping update (error: %v)", err))
+				rt.Logger.Error().Err(err).Msg("error connecting to PSQL database, skipping update")
 				return
 			}
 
 			defer db.Close()
 
 			if rt.shouldReload(rt.opts.Listener) {
-				log.Println("router: updates found")
+				rt.Logger.Info().Msg("updates found")
 				rt.reloadRoutes(db)
 			} else {
-				log.Println("router: no updates found - really?")
+				rt.Logger.Info().Msg("no updates found")
 			}
 		}()
 	}
@@ -172,7 +156,7 @@ func (rt *Router) shouldReload(listener *pq.Listener) bool {
 	select {
 	case n := <-listener.Notify:
 		// n.Extra contains the payload from the notification
-		log.Println("notification:", n.Channel)
+		rt.Logger.Info().Msgf("notification:: %v", n.Channel)
 		return true
 	default:
 		if err := listener.Ping(); err != nil {
@@ -189,27 +173,24 @@ func (rt *Router) reloadRoutes(db *sql.DB) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("router: recovered from panic in reloadRoutes:", r)
-			log.Println("router: original routes have not been modified")
-			// errorMessage := fmt.Sprintf("panic: %v", r)
-			// err := logger.RecoveredError{ErrorMessage: errorMessage}
-			// logger.NotifySentry(logger.ReportableError{Error: err}) // TODO
+			rt.Logger.Err(fmt.Errorf("%v", r)).Msgf("recovered from panic in reloadRoutes")
+			rt.Logger.Info().Msg("original routes have not been modified")
 		}
 	}()
 
-	log.Println("router: reloading routes")
+	rt.Logger.Info().Msg("reloading routes")
 
 	newmux := triemux.NewMux()
 
 	backends := rt.loadBackendsFromEnv()
-	loadRoutes(db, newmux, backends)
+	loadRoutes(db, newmux, backends, rt.Logger)
 	routeCount := newmux.RouteCount()
 
 	rt.lock.Lock()
 	rt.mux = newmux
 	rt.lock.Unlock()
 
-	log.Println(fmt.Sprintf("router: reloaded %d routes", routeCount))
+	rt.Logger.Info().Int("route_count", routeCount).Msg("reloaded routes")
 }
 
 func (rt *Router) loadBackendsFromEnv() (backends map[string]http.Handler) {
@@ -226,15 +207,13 @@ func (rt *Router) loadBackendsFromEnv() (backends map[string]http.Handler) {
 		backendURL := pair[1]
 
 		if backendURL == "" {
-			log.Println(fmt.Sprintf("no URL for backend %s provided, skipping)", backendID))
-			// logger.Warn().Msgf("no URL for backend %s provided, skipping", backendID)
+			rt.Logger.Warn().Msgf("no URL for backend %s provided, skipping", backendID)
 			continue
 		}
 
 		backend, err := url.Parse(backendURL)
 		if err != nil {
-			log.Println(fmt.Sprintf("failed to parse URL %s for backend %s, skipping", backendURL, backendID))
-			// logger.Warn().Err(err).Msgf("failed to parse URL %s for backend %s, skipping", backendURL, backendID)
+			rt.Logger.Warn().Err(err).Msgf("failed to parse URL %s for backend %s, skipping", backendURL, backendID)
 			continue
 		}
 
@@ -243,7 +222,7 @@ func (rt *Router) loadBackendsFromEnv() (backends map[string]http.Handler) {
 			backend,
 			rt.opts.BackendConnTimeout,
 			rt.opts.BackendHeaderTimeout,
-			rt.logger,
+			rt.Logger,
 		)
 	}
 
@@ -252,12 +231,12 @@ func (rt *Router) loadBackendsFromEnv() (backends map[string]http.Handler) {
 
 // loadRoutes is a helper function which loads routes from the passed database
 // and registers them with the passed proxy mux.
-func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler) {
+func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler, logger zerolog.Logger) {
 	route := &Route{}
 
 	rows, err := db.Query("SELECT incoming_path, route_type, handler, disabled, backend_id, redirect_to, redirect_type, segments_mode FROM routes")
 	if err != nil {
-		log.Println(fmt.Sprintf("pq: error retrieving row information from table, skipping update. (error: %v)", err))
+		logger.Error().Err(err).Msg("error retrieving row information from routes database table, skipping update.")
 		return
 	}
 
@@ -271,7 +250,7 @@ func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler) 
 	for rows.Next() {
 		err := rows.Scan(&route.IncomingPath, &route.RouteType, &route.Handler, &route.Disabled, &route.BackendID, &route.RedirectTo, &route.RedirectType, &route.SegmentsMode)
 		if err != nil {
-			log.Println(fmt.Sprintf("pq: error retrieving row information from table, skipping update. (error: %v)", err))
+			logger.Error().Err(err).Msg("error retrieving row information from routes database table, skipping update.")
 			return
 		}
 
@@ -281,13 +260,13 @@ func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler) 
 		// Unescape them here because the http.Request objects we match against contain the unescaped variants.
 		incomingURL, err := url.Parse(route.IncomingPath.String)
 		if err != nil {
-			log.Println(fmt.Sprintf("router: found route %+v with invalid incoming path '%s', skipping!", route, route.IncomingPath.String))
+			logger.Warn().Interface("route", route).Str("incoming_path", route.IncomingPath.String).Msg("ignoring route with invalid incoming path")
 			continue
 		}
 
 		if route.Disabled {
 			mux.Handle(incomingURL.Path, prefix, unavailableHandler)
-			log.Println(fmt.Sprintf("router: registered %s (prefix: %v)(disabled) -> Unavailable", incomingURL.Path, prefix))
+			logger.Info().Msgf("registered %s (prefix: %v)(disabled) -> Unavailable", incomingURL.Path, prefix)
 			continue
 		}
 
@@ -295,31 +274,27 @@ func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler) 
 		case "backend":
 			handler, ok := backends[route.BackendID.String]
 			if !ok {
-				log.Println(fmt.Sprintf("router: found route %+v which references unknown backend "+
-					"%s, skipping!", route, route.BackendID.String))
+				logger.Warn().Str("incoming_path", route.IncomingPath.String).Str("backend_id", route.BackendID.String).Msg("ignoring route with unknown backend")
 				continue
 			}
 			mux.Handle(incomingURL.Path, prefix, handler)
-			log.Println(fmt.Sprintf("router: registered %s (prefix: %v) for %s",
-				incomingURL.Path, prefix, route.BackendID.String))
+			logger.Info().Msgf("registered %s (prefix: %v) for %s", incomingURL.Path, prefix, route.BackendID.String)
 		case "redirect":
 			redirectTemporarily := (route.RedirectType.String == "temporary")
 			handler := handlers.NewRedirectHandler(incomingURL.Path, route.RedirectTo.String, shouldPreserveSegments(route), redirectTemporarily)
 			mux.Handle(incomingURL.Path, prefix, handler)
-			log.Println(fmt.Sprintf("router: registered %s (prefix: %v) -> %s",
-				incomingURL.Path, prefix, route.RedirectTo.String))
+			logger.Info().Msgf("registered %s (prefix: %v) -> %s", incomingURL.Path, prefix, route.RedirectTo.String)
 		case "gone":
 			mux.Handle(incomingURL.Path, prefix, goneHandler)
-			log.Println(fmt.Sprintf("router: registered %s (prefix: %v) -> Gone", incomingURL.Path, prefix))
+			logger.Info().Msgf("registered %s (prefix: %v) -> Gone", incomingURL.Path, prefix)
 		case "boom":
 			// Special handler so that we can test failure behaviour.
 			mux.Handle(incomingURL.Path, prefix, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("Boom!!!")
 			}))
-			log.Println(fmt.Sprintf("router: registered %s (prefix: %v) -> Boom!!!", incomingURL.Path, prefix))
+			logger.Info().Msgf("registered %s (prefix: %v) -> Boom!!!", incomingURL.Path, prefix)
 		default:
-			log.Println(fmt.Sprintf("router: found route %+v with unknown handler type "+
-				"%s, skipping!", route, route.Handler.String))
+			logger.Warn().Interface("route", route).Str("handler_type", route.Handler.String).Msg("ignoring route with unknown handler type")
 			continue
 		}
 	}
