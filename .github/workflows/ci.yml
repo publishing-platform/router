@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore:
+      - ".git**"
+      - README.md
+      - docs
+  workflow_dispatch:
+
+jobs:
+  test-go:
+    name: Test Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make test
+        timeout-minutes: 15

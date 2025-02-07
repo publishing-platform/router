@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/publishing-platform/router/internal/logger"
+	"github.com/rs/zerolog"
 )
 
 var TLSSkipVerify bool
@@ -22,7 +22,7 @@ func NewBackendHandler(
 	backendID string,
 	backendURL *url.URL,
 	connectTimeout, headerTimeout time.Duration,
-	logger logger.Logger,
+	logger zerolog.Logger,
 ) http.Handler {
 
 	proxy := httputil.NewSingleHostReverseProxy(backendURL)
@@ -66,7 +66,7 @@ type backendTransport struct {
 	backendID string
 
 	wrapped *http.Transport // implements http.RoundTripper interface (RoundTrip method executes a single HTTP transaction, returning a Response for a provided Request)
-	logger  logger.Logger
+	logger  zerolog.Logger
 }
 
 // Construct a backendTransport that wraps an http.Transport and implements http.RoundTripper.
@@ -75,7 +75,7 @@ type backendTransport struct {
 func newBackendTransport(
 	backendID string,
 	connectTimeout, headerTimeout time.Duration,
-	logger logger.Logger,
+	logger zerolog.Logger,
 ) *backendTransport {
 
 	transport := http.Transport{}
@@ -144,11 +144,14 @@ func (bt *backendTransport) RoundTrip(req *http.Request) (resp *http.Response, e
 			responseCode = http.StatusInternalServerError
 		}
 		closeBody(resp)
-		// logger.NotifySentry(logger.ReportableError{Error: err, Request: req, Response: resp}) // TODO
-		bt.logger.LogFromBackendRequest(
-			map[string]interface{}{"error": err.Error(), "status": responseCode},
-			req,
-		)
+
+		bt.logger.Error().
+			Err(err).
+			Int("status", responseCode).
+			Str("method", req.Method).
+			Str("url", req.URL.String()).
+			Msg("backend request error")
+
 		return newErrorResponse(responseCode), nil
 	}
 	responseCode = resp.StatusCode
