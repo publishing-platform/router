@@ -281,7 +281,7 @@ func loadRoutes(db *sql.DB, mux *triemux.Mux, backends map[string]http.Handler, 
 			logger.Info().Msgf("registered %s (prefix: %v) for %s", incomingURL.Path, prefix, route.BackendID.String)
 		case "redirect":
 			redirectTemporarily := (route.RedirectType.String == "temporary")
-			handler := handlers.NewRedirectHandler(incomingURL.Path, route.RedirectTo.String, shouldPreserveSegments(route), redirectTemporarily)
+			handler := handlers.NewRedirectHandler(incomingURL.Path, route.RedirectTo.String, shouldPreserveSegments(route), redirectTemporarily, logger)
 			mux.Handle(incomingURL.Path, prefix, handler)
 			logger.Info().Msgf("registered %s (prefix: %v) -> %s", incomingURL.Path, prefix, route.RedirectTo.String)
 		case "gone":
