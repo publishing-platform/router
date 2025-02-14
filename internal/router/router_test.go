@@ -1,57 +1,62 @@
 package router
 
 import (
-	"os"
-	"time"
+	"fmt"
+	"net/http"
+	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/rs/zerolog"
+	"github.com/pashagolub/pgxmock/v4"
 )
 
 var _ = Describe("Router", func() {
-	Describe("loadBackendsFromEnv", func() {
+	Describe("reloadRoutes", func() {
 		var (
-			router *Router
-			logger = zerolog.New(os.Stdout)
+			mockPool pgxmock.PgxPoolIface
+			router   *Router
 		)
 
 		BeforeEach(func() {
+			var err error
+			mockPool, err = pgxmock.NewPool()
+			Expect(err).NotTo(HaveOccurred())
+
 			router = &Router{
-				opts: Options{
-					BackendConnTimeout:   1 * time.Second,
-					BackendHeaderTimeout: 20 * time.Second,
-					Logger:               logger,
+				lock: sync.RWMutex{},
+				backends: map[string]http.Handler{
+					"backend1": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, "http://example.com", http.StatusFound)
+					}),
+					"backend2": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, "http://example.com", http.StatusFound)
+					}),
 				},
 			}
 		})
 
-		It("should load backends from environment variables", func() {
-			os.Setenv("BACKEND_URL_testBackend", "http://example.com")
-			defer os.Unsetenv("BACKEND_URL_testBackend")
-
-			backends := router.loadBackendsFromEnv()
-
-			Expect(backends).To(HaveKey("testBackend"))
-			Expect(backends["testBackend"]).ToNot(BeNil())
+		AfterEach(func() {
+			mockPool.Close()
 		})
 
-		It("should skip backends with empty URLs", func() {
-			os.Setenv("BACKEND_URL_emptyBackend", "")
-			defer os.Unsetenv("BACKEND_URL_emptyBackend")
+		It("should reload routes from content store successfully", func() {
+			rows := pgxmock.NewRows([]string{"incoming_path", "route_type", "handler", "disabled", "backend_id", "redirect_to", "redirect_type", "segments_mode"}).
+				AddRow(stringPtr("/path1"), stringPtr("exact"), stringPtr("backend"), boolPtr(false), stringPtr("backend1"), nil, nil, nil).
+				AddRow(stringPtr("/path2"), stringPtr("prefix"), stringPtr("backend"), boolPtr(false), stringPtr("backend2"), nil, nil, nil)
 
-			backends := router.loadBackendsFromEnv()
+			mockPool.ExpectQuery("SELECT").WillReturnRows(rows)
 
-			Expect(backends).ToNot(HaveKey("emptyBackend"))
+			router.reloadRoutes(mockPool)
+
+			Expect(router.mux.RouteCount()).To(Equal(2))
 		})
 
-		It("should skip backends with invalid URLs", func() {
-			os.Setenv("BACKEND_URL_invalidBackend", "://invalid-url")
-			defer os.Unsetenv("BACKEND_URL_invalidBackend")
+		It("should handle panic and log error", func() {
+			defer GinkgoRecover()
 
-			backends := router.loadBackendsFromEnv()
+			mockPool.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("some error"))
 
-			Expect(backends).ToNot(HaveKey("invalidBackend"))
+			Expect(func() { router.reloadRoutes(mockPool) }).NotTo(Panic())
 		})
 	})
 })

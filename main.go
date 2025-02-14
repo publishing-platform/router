@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -76,20 +77,20 @@ func main() {
 	logger := zerolog.New(m).With().Timestamp().Logger()
 
 	var (
-		pubAddr         = getenv("ROUTER_PUBADDR", ":8080")
-		apiAddr         = getenv("ROUTER_APIADDR", ":8081")
-		databaseURL     = getenv("DATABASE_URL", "postgresql://postgres@127.0.0.1:5432/router_development?sslmode=disable")
-		databaseName    = getenv("DATABASE_NAME", "router_development")
-		dbPollInterval  = getenvDuration("ROUTER_POLL_INTERVAL", "2s")
-		tlsSkipVerify   = os.Getenv("ROUTER_TLS_SKIP_VERIFY") != ""
-		beConnTimeout   = getenvDuration("ROUTER_BACKEND_CONNECT_TIMEOUT", "1s")
-		beHeaderTimeout = getenvDuration("ROUTER_BACKEND_HEADER_TIMEOUT", "20s")
-		feReadTimeout   = getenvDuration("ROUTER_FRONTEND_READ_TIMEOUT", "60s")
-		feWriteTimeout  = getenvDuration("ROUTER_FRONTEND_WRITE_TIMEOUT", "60s")
+		pubAddr             = getenv("ROUTER_PUBADDR", ":8080")
+		apiAddr             = getenv("ROUTER_APIADDR", ":8081")
+		databaseURL         = getenv("DATABASE_URL", "postgresql://postgres@127.0.0.1:5432/router_development?sslmode=disable")
+		tlsSkipVerify       = os.Getenv("ROUTER_TLS_SKIP_VERIFY") != ""
+		beConnTimeout       = getenvDuration("ROUTER_BACKEND_CONNECT_TIMEOUT", "1s")
+		beHeaderTimeout     = getenvDuration("ROUTER_BACKEND_HEADER_TIMEOUT", "20s")
+		feReadTimeout       = getenvDuration("ROUTER_FRONTEND_READ_TIMEOUT", "60s")
+		feWriteTimeout      = getenvDuration("ROUTER_FRONTEND_WRITE_TIMEOUT", "60s")
+		routeReloadInterval = getenvDuration("ROUTER_ROUTE_RELOAD_INTERVAL", "1m")
 	)
 
 	logger.Info().Msgf("frontend read timeout: %v", feReadTimeout)
 	logger.Info().Msgf("frontend write timeout: %v", feWriteTimeout)
+	logger.Info().Msgf("GOMAXPROCS value of %d", runtime.GOMAXPROCS(0))
 
 	if tlsSkipVerify {
 		handlers.TLSSkipVerify = true
@@ -98,8 +99,7 @@ func main() {
 
 	rout, err := router.NewRouter(router.Options{
 		DatabaseURL:          databaseURL,
-		DatabaseName:         databaseName,
-		DatabasePollInterval: dbPollInterval,
+		RouteReloadInterval:  routeReloadInterval,
 		BackendConnTimeout:   beConnTimeout,
 		BackendHeaderTimeout: beHeaderTimeout,
 		Logger:               logger,
@@ -132,7 +132,7 @@ func main() {
 	// fmt.Println(ok)
 	// ======================================================
 
-	go rout.SelfUpdateRoutes()
+	go rout.PeriodicRouteUpdates()
 
 	go listenAndServeOrFatal(pubAddr, rout, feReadTimeout, feWriteTimeout)
 	logger.Info().Msgf("listening for requests on %v", pubAddr)
