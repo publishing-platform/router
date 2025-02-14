@@ -9,10 +9,6 @@ import (
 
 const (
 	cacheDuration = 30 * time.Minute
-
-	redirectHandlerType               = "redirect-handler"
-	pathPreservingRedirectHandlerType = "path-preserving-redirect-handler"
-	downcaseRedirectHandlerType       = "downcase-redirect-handler"
 )
 
 func addCacheHeaders(w http.ResponseWriter) {

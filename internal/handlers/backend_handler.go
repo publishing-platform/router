@@ -116,6 +116,7 @@ func newBackendTransport(
 	transport.ExpectContinueTimeout = 1 * time.Second
 
 	if TLSSkipVerify {
+		// #nosec G402 -- TODO: fix tests to use TLS properly.
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
@@ -154,7 +155,6 @@ func (bt *backendTransport) RoundTrip(req *http.Request) (resp *http.Response, e
 
 		return newErrorResponse(responseCode), nil
 	}
-	responseCode = resp.StatusCode
 	populateViaHeader(resp.Header, fmt.Sprintf("%d.%d", resp.ProtoMajor, resp.ProtoMinor))
 	return
 }
