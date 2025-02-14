@@ -19,8 +19,8 @@ func addCacheHeaders(w http.ResponseWriter) {
 }
 
 type redirectHandler struct {
-	url  string
-	code int
+	url    string
+	code   int
 	logger zerolog.Logger
 }
 
