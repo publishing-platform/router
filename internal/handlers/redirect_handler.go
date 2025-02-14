@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -17,25 +19,27 @@ func addCacheHeaders(w http.ResponseWriter) {
 }
 
 type redirectHandler struct {
-	url  string
-	code int
+	url    string
+	code   int
+	logger zerolog.Logger
 }
 
 type pathPreservingRedirectHandler struct {
 	sourcePrefix string
 	targetPrefix string
 	code         int
+	logger       zerolog.Logger
 }
 
-func NewRedirectHandler(source, target string, preserve bool, temporary bool) http.Handler {
+func NewRedirectHandler(source, target string, preserve bool, temporary bool, logger zerolog.Logger) http.Handler {
 	statusMoved := http.StatusMovedPermanently
 	if temporary {
 		statusMoved = http.StatusFound
 	}
 	if preserve {
-		return &pathPreservingRedirectHandler{source, target, statusMoved}
+		return &pathPreservingRedirectHandler{source, target, statusMoved, logger}
 	}
-	return &redirectHandler{target, statusMoved}
+	return &redirectHandler{target, statusMoved, logger}
 }
 
 func (handler *redirectHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
