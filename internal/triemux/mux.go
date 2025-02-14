@@ -11,6 +11,7 @@ import (
 
 	"github.com/publishing-platform/router/internal/handlers"
 	"github.com/publishing-platform/router/internal/trie"
+	"github.com/rs/zerolog"
 )
 
 type Mux struct {
@@ -19,14 +20,16 @@ type Mux struct {
 	prefixTrie *trie.Trie[http.Handler]
 	count      int
 	downcaser  http.Handler
+	logger     zerolog.Logger
 }
 
 // NewMux makes a new empty Mux.
-func NewMux() *Mux {
+func NewMux(logger zerolog.Logger) *Mux {
 	return &Mux{
 		exactTrie:  trie.NewTrie[http.Handler](),
 		prefixTrie: trie.NewTrie[http.Handler](),
 		downcaser:  handlers.NewDowncaseRedirectHandler(),
+		logger:     logger,
 	}
 }
 
@@ -37,11 +40,8 @@ func NewMux() *Mux {
 func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if mux.count == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		// TODO
-		// logger.NotifySentry(logger.ReportableError{
-		// 	Error:   logger.RecoveredError{ErrorMessage: "route table is empty"},
-		// 	Request: r,
-		// })
+		mux.logger.Error().Msg("route table is empty")
+
 		return
 	}
 

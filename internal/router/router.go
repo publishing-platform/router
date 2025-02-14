@@ -75,7 +75,7 @@ func NewRouter(o Options) (rt *Router, err error) {
 	}
 
 	rt = &Router{
-		mux:        triemux.NewMux(),
+		mux:        triemux.NewMux(o.Logger),
 		opts:       o,
 		ReloadChan: make(chan bool, 1),
 		Logger:     o.Logger,
@@ -180,7 +180,7 @@ func (rt *Router) reloadRoutes(db *sql.DB) {
 
 	rt.Logger.Info().Msg("reloading routes")
 
-	newmux := triemux.NewMux()
+	newmux := triemux.NewMux(rt.Logger)
 
 	backends := rt.loadBackendsFromEnv()
 	loadRoutes(db, newmux, backends, rt.Logger)
