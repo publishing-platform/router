@@ -96,7 +96,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/pashagolub/pgxmock/v4 v4.5.0
+# github.com/pashagolub/pgxmock/v4 v4.6.0
 ## explicit; go 1.22.0
 github.com/pashagolub/pgxmock/v4
 # github.com/rs/zerolog v1.33.0
