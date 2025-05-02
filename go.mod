@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/pashagolub/pgxmock/v4 v4.7.0
 	github.com/rs/zerolog v1.33.0
 )
