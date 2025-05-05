@@ -1,7 +1,7 @@
 # github.com/buger/jsonparser v1.1.1
 ## explicit; go 1.13
 github.com/buger/jsonparser
-# github.com/getsentry/sentry-go v0.31.1
+# github.com/getsentry/sentry-go v0.32.0
 ## explicit; go 1.21
 github.com/getsentry/sentry-go
 github.com/getsentry/sentry-go/internal/debug
