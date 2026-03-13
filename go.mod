@@ -1,6 +1,6 @@
 module github.com/publishing-platform/router
 
-go 1.23.6
+go 1.26.1
 
 require (
 	github.com/getsentry/sentry-go v0.38.0
