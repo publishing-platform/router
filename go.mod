@@ -3,8 +3,8 @@ module github.com/publishing-platform/router
 go 1.26.1
 
 require (
-	github.com/getsentry/sentry-go v0.38.0
-	github.com/getsentry/sentry-go/zerolog v0.38.0
+	github.com/getsentry/sentry-go v0.43.0
+	github.com/getsentry/sentry-go/zerolog v0.43.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
 	github.com/onsi/ginkgo/v2 v2.28.1
