@@ -3,8 +3,8 @@ module github.com/publishing-platform/router
 go 1.26.1
 
 require (
-	github.com/getsentry/sentry-go v0.43.0
-	github.com/getsentry/sentry-go/zerolog v0.43.0
+	github.com/getsentry/sentry-go v0.45.0
+	github.com/getsentry/sentry-go/zerolog v0.45.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
 	github.com/onsi/ginkgo/v2 v2.28.1
@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
