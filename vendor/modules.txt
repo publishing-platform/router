@@ -1,10 +1,10 @@
 # github.com/Masterminds/semver/v3 v3.4.0
 ## explicit; go 1.21
 github.com/Masterminds/semver/v3
-# github.com/buger/jsonparser v1.1.1
+# github.com/buger/jsonparser v1.1.2
 ## explicit; go 1.13
 github.com/buger/jsonparser
-# github.com/getsentry/sentry-go v0.43.0
+# github.com/getsentry/sentry-go v0.45.1
 ## explicit; go 1.24.0
 github.com/getsentry/sentry-go
 github.com/getsentry/sentry-go/attribute
@@ -17,7 +17,8 @@ github.com/getsentry/sentry-go/internal/protocol
 github.com/getsentry/sentry-go/internal/ratelimit
 github.com/getsentry/sentry-go/internal/telemetry
 github.com/getsentry/sentry-go/internal/util
-# github.com/getsentry/sentry-go/zerolog v0.43.0
+github.com/getsentry/sentry-go/report
+# github.com/getsentry/sentry-go/zerolog v0.45.1
 ## explicit; go 1.24.0
 github.com/getsentry/sentry-go/zerolog
 # github.com/go-logr/logr v1.4.3
