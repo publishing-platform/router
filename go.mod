@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.40.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.35.1
 )
 
 require (
