@@ -7,7 +7,7 @@ require (
 	github.com/getsentry/sentry-go/zerolog v0.46.2
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
-	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/ginkgo/v2 v2.30.0
 	github.com/onsi/gomega v1.41.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/rs/zerolog v1.35.1
