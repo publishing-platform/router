@@ -3,7 +3,7 @@ module github.com/publishing-platform/router
 go 1.26.1
 
 require (
-	github.com/getsentry/sentry-go v0.46.2
+	github.com/getsentry/sentry-go v0.47.0
 	github.com/getsentry/sentry-go/zerolog v0.46.2
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
@@ -29,8 +29,8 @@ require (
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 )
